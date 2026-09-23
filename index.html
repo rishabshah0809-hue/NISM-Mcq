@@ -351,6 +351,7 @@ a{color:var(--navy)}
 const USER_NAME   = "VEXY";
 const DURATION_MS = 70 * 60 * 1000;          // 1 hr 10 min per set
 const PASS_PCT    = 60;
+const NEG_MARK    = 0.25;                    // marks deducted per wrong answer (NISM rule)
 const PER_PAGE    = 6;                       // cards per page on the home screen
 const EXAM_NAME   = "NISM Series VIII: Equity Derivatives Certification Examination- 2026";
 const BANK = window.QUESTION_BANK, SETS = window.QUESTION_SETS;
@@ -367,6 +368,14 @@ const store = {
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch (e) {} }
 };
 store.load();
+// Marks = correct − 0.25 × incorrect (also re-scores results saved before negative marking)
+const fmtNum = n => String(Math.round(n * 100) / 100);
+function applyScore(r) {
+  r.marks = r.correct - NEG_MARK * r.incorrect;
+  r.pct = Math.round((r.marks / r.total) * 10000) / 100;
+  return r;
+}
+store.data.results.forEach(applyScore);
 if (!store.data.reg) { store.data.reg = "VX" + String(Math.floor(1e9 + Math.random() * 9e9)); store.save(); }
 
 /* =====================================================================
@@ -441,12 +450,12 @@ function renderHome() {
         const left = p ? fmtTime(p.endAt - Date.now()) : null;
         return `<div class="ecard">${p ? `<span class="badge prog">In-progress · ${left} left</span>` : r ? `<span class="badge done">Last: ${r.pct}% · ${r.pct >= PASS_PCT ? "PASS" : "FAIL"}</span>` : ""}
           <h4 title="${esc(setTitle(x))}">${esc(setTitle(x))}</h4>
-          <div class="meta"><span>Score: ${r ? r.correct : 0}</span><span>${clock} 70 Mins</span></div>
+          <div class="meta"><span>Score: ${r ? fmtNum(r.marks) : 0}</span><span>${clock} 70 Mins</span></div>
           <a data-start="${x}">${p ? "Resume Exam" : "Start Exam"}</a>${deco}</div>`;
       }
       return `<div class="ecard"><span class="badge ${x.pct >= PASS_PCT ? "done" : "prog"}">${x.pct >= PASS_PCT ? "PASS" : "FAIL"} · ${fmtDate(x.date)}</span>
         <h4>${esc(setTitle(x.setId))}</h4>
-        <div class="meta"><span>Score: ${x.correct}/${x.total}</span><span>${x.pct}%</span></div>
+        <div class="meta"><span>Score: ${fmtNum(x.marks)}/${x.total}</span><span>${x.pct}%</span></div>
         <a data-result="${x.id}">View Score Card</a>${deco}</div>`;
     }).join("");
 
@@ -468,7 +477,7 @@ $("cards").onclick = e => {
   if (store.data.progress[i]) return (location.hash = "#/exam/" + i);
   const m = modal(`<h3>${esc(setTitle(i))}</h3>
     <ul><li>Total questions: <b>50</b> (1 mark each)</li><li>Duration: <b>1 hr 10 min</b> – the exam submits automatically when time runs out</li>
-    <li>No negative marking</li><li>Passing score: <b>${PASS_PCT}%</b></li><li>You can mark questions for review and come back to them</li></ul>
+    <li>Negative marking: <b>${NEG_MARK} mark</b> deducted for each wrong answer (none for unanswered questions)</li><li>Passing score: <b>${PASS_PCT}%</b></li><li>You can mark questions for review and come back to them</li></ul>
     <div class="actions"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mGo">Start Exam</button></div>`);
   m.querySelector("#mCancel").onclick = closeModal;
   m.querySelector("#mGo").onclick = () => {
@@ -541,9 +550,9 @@ const exam = {
     const r = {
       id: Date.now().toString(36), setId: this.setId, qids: ids.slice(), date: new Date().toISOString(), timeUp,
       answers: ans, total: ids.length, attempted, correct, incorrect: attempted - correct,
-      pct: Math.round((correct / ids.length) * 100), timeTaken: Math.min(DURATION_MS, Date.now() - this.st.startedAt)
+      timeTaken: Math.min(DURATION_MS, Date.now() - this.st.startedAt)
     };
-    store.data.results.push(r);
+    store.data.results.push(applyScore(r));
     delete store.data.progress[this.setId];
     store.save();
     if (timeUp) alert("Time is up! Your exam has been submitted automatically.");
@@ -601,7 +610,7 @@ function renderScore(id) {
   $("scVerdict").className = "verdict " + (pass ? "pass" : "fail");
   $("scReg").textContent = store.data.reg;
   $("scDate").textContent = fmtDate(r.date);
-  $("scMarks").textContent = r.correct;
+  $("scMarks").textContent = fmtNum(r.marks);
   $("scTotal").textContent = "/ " + r.total;
   $("scPct").textContent = r.pct + "%";
   $("scAtt").textContent = r.attempted;
@@ -624,7 +633,7 @@ function paraHTML(t) {
 function renderKey(id) {
   const r = findResult(id); if (!r) return (location.hash = "#/home");
   showView("key");
-  $("keyTitle").textContent = `Answer Key - Set ${r.setId + 1} · ${r.correct}/${r.total} (${r.pct}%)`;
+  $("keyTitle").textContent = `Answer Key - Set ${r.setId + 1} · ${fmtNum(r.marks)}/${r.total} (${r.pct}%) · ${r.correct} correct, ${r.incorrect} wrong (−${fmtNum(r.incorrect * NEG_MARK)})`;
   $("keyBack").onclick = () => (location.hash = "#/score/" + r.id);
 
   const rows = (r.qids || SETS[r.setId]).map((qid, i) => {
@@ -639,7 +648,7 @@ function renderKey(id) {
   const label = { c: "Correct", w: "Incorrect", n: "Not Attempted" };
   $("keyList").innerHTML = rows.filter(x => keyState.filter === "all" || x.s === keyState.filter).map(({ i, q, u, s }) => `
     <div class="box kq">
-      <div class="kq-top"><span class="num">Q ${i + 1}/${rows.length}</span><span class="st ${s}">${label[s]}</span><span>Chapter ${q.ch}: ${esc(q.chapter)}</span></div>
+      <div class="kq-top"><span class="num">Q ${i + 1}/${rows.length}</span><span class="st ${s}">${label[s]}${s === "c" ? " · +1" : s === "w" ? " · −" + NEG_MARK : " · 0"}</span><span>Chapter ${q.ch}: ${esc(q.chapter)}</span></div>
       <p class="qtext">${esc(q.q)}</p>
       ${q.options.map((o, k) => {
         const right = k === q.answer, mine = k === u;
