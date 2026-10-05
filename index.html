@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vexy Mock Tests – NISM Series VIII</title>
+<title>Vexy Mock Tests</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
@@ -44,6 +44,9 @@ a{color:var(--navy)}
 /* ============ HOME (screenshot 3) ============ */
 .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 60px;background:#fff;box-shadow:var(--shadow)}
 .topbar h1{font-size:21px;font-weight:400}
+.exam-switch{display:flex;gap:8px;flex-wrap:wrap;padding:14px 60px 0;background:#fff}
+.exam-switch a{padding:9px 14px;border:1px solid #d7d7df;border-radius:6px;text-decoration:none;font-size:14px;color:#444}
+.exam-switch a.active{background:var(--navy);border-color:var(--navy);color:#fff}
 .user-chip{display:flex;align-items:center;gap:10px;font-weight:700}
 .user-chip .av{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:15px}
 .home{display:flex;gap:40px;padding:38px 60px 30px;align-items:flex-start;flex:1}
@@ -109,6 +112,8 @@ a{color:var(--navy)}
 .qtab span{position:relative}
 .mark1{position:absolute;right:20px;top:20px;color:#666;font-size:17px}
 .qtext{font-size:17px;font-weight:700;line-height:1.3;margin:22px 0 20px;white-space:pre-line}
+.caselet{margin:18px 0 6px;padding:16px 18px;border:1px solid #d8d8ec;border-left:4px solid var(--navy);border-radius:6px;background:#f7f7fc;line-height:1.55;white-space:pre-line;font-size:15px}
+.caselet b{display:block;color:var(--navy);margin-bottom:6px}
 .opt{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:6px;padding:12px 12px;margin-bottom:10px;cursor:pointer;font-size:17px;line-height:1.35;transition:.12s}
 .opt:hover{border-color:#b9b9d6}
 .opt input{appearance:none;width:19px;height:19px;border:2px solid #555;border-radius:50%;flex-shrink:0;display:grid;place-items:center;cursor:pointer}
@@ -178,7 +183,7 @@ a{color:var(--navy)}
 /* ============ Responsive ============ */
 @media (max-width:1400px){.cards{grid-template-columns:repeat(2,1fr)}.filter{width:300px}}
 @media (max-width:1100px){
-  .home,.topbar{padding-left:20px;padding-right:20px}
+  .home,.topbar,.exam-switch{padding-left:20px;padding-right:20px}
   .home{flex-direction:column;gap:20px}
   .filter{width:100%;min-height:0;padding:20px;display:flex;flex-wrap:wrap;gap:0 40px}
   .filter-head{width:100%;margin-bottom:14px}.filter .group{margin-bottom:10px}
@@ -214,9 +219,10 @@ a{color:var(--navy)}
 <!-- ======================= HOME / DASHBOARD ======================= -->
 <section id="view-home" class="view">
   <header class="topbar">
-    <h1>Practice Examinations</h1>
+    <h1 id="homeHeading">Practice Examinations</h1>
     <div class="user-chip"><span class="av">V</span><span id="userName"></span></div>
   </header>
+  <nav class="exam-switch" aria-label="Choose certification"><a id="switchEquity" href="index.html">Equity Derivatives</a><a id="switchRA" href="index.html?exam=ra">Research Analyst</a></nav>
   <div class="home">
     <aside class="filter">
       <div class="filter-head"><h2>Filter</h2><a id="clearFilter">Clear Filter</a></div>
@@ -282,6 +288,7 @@ a{color:var(--navy)}
           <span id="qnum"></span>
         </div>
         <div class="mark1">Mark: 1</div>
+        <div class="caselet hidden" id="caselet"></div>
         <p class="qtext" id="qtext"></p>
         <div id="options"></div>
       </div>
@@ -344,24 +351,33 @@ a{color:var(--navy)}
 <div id="modalRoot"></div>
 
 <script src="questions.js"></script>
+<script src="questions-ra.js"></script>
 <script>
 /* =====================================================================
    CONFIG
    ===================================================================== */
 const USER_NAME   = "VEXY";
-const DURATION_MS = 70 * 60 * 1000;          // 1 hr 10 min per set
-const PASS_PCT    = 60;
-const NEG_MARK    = 0.25;                    // marks deducted per wrong answer (NISM rule)
 const PER_PAGE    = 6;                       // cards per page on the home screen
-const EXAM_NAME   = "NISM Series VIII: Equity Derivatives Certification Examination- 2026";
-const BANK = window.QUESTION_BANK, SETS = window.QUESTION_SETS;
+const isRA = new URLSearchParams(location.search).get("exam") === "ra";
+const EXAM = isRA ? window.RA_EXAM : {
+  id: "equity", name: "NISM Series VIII: Equity Derivatives Certification Examination - 2026",
+  shortName: "NISM Series VIII: Equity Derivatives", durationMinutes: 70, passPct: 60, negativeMark: 0.25,
+  bank: window.QUESTION_BANK, sets: window.QUESTION_SETS
+};
+const DURATION_MS = EXAM.durationMinutes * 60 * 1000;
+const PASS_PCT    = EXAM.passPct;
+const NEG_MARK    = EXAM.negativeMark;
+const EXAM_NAME   = EXAM.name;
+const BANK = EXAM.bank, SETS = EXAM.sets;
 const L = "abcd";
-const setTitle = i => `Set ${i + 1} – Mock Test for ${EXAM_NAME}`;
+const durationLabel = () => EXAM.durationMinutes === 120 ? "2 hrs" : "1 hr 10 min";
+const setTitle = i => EXAM.setNames ? `${EXAM.setNames[i]} – ${EXAM.shortName}` : `Set ${i + 1} – Mock Test for ${EXAM_NAME}`;
+document.title = `Vexy Mock Tests – ${EXAM.shortName}`;
 
 /* =====================================================================
    STORAGE (localStorage, fails safely in private mode)
    ===================================================================== */
-const KEY = "vexy_nism8_v1";
+const KEY = `vexy_${EXAM.id}_v1`;
 const store = {
   data: { progress: {}, results: [] },
   load() { try { const d = JSON.parse(localStorage.getItem(KEY)); if (d) this.data = d; } catch (e) {} },
@@ -416,6 +432,9 @@ document.querySelectorAll("[data-go=home]").forEach(b => b.onclick = () => (loca
    ===================================================================== */
 const home = { tab: "exams", page: 1, q: "", filters: new Set() };
 $("userName").textContent = USER_NAME;
+$("homeHeading").textContent = `${EXAM.shortName} – Practice Examinations`;
+$("switchEquity").classList.toggle("active", !isRA);
+$("switchRA").classList.toggle("active", isRA);
 
 function renderHome() {
   showView("home");
@@ -429,7 +448,7 @@ function renderHome() {
       const inProg = !!store.data.progress[i], res = lastResult(i), f = home.filters;
       if (f.has("available") && !f.has("progress") && inProg) return false;
       if (f.has("progress") && !f.has("available") && !inProg) return false;
-      if (f.has("advance") && i < 5) return false;                          // Advance = Sets 6-10
+      if (f.has("advance") && i < Math.floor(SETS.length / 2)) return false;
       if (f.has("top") && !(res && res.pct >= PASS_PCT)) return false;       // Top Ranked = sets you passed
       return setTitle(i).toLowerCase().includes(home.q);
     });
@@ -450,7 +469,7 @@ function renderHome() {
         const left = p ? fmtTime(p.endAt - Date.now()) : null;
         return `<div class="ecard">${p ? `<span class="badge prog">In-progress · ${left} left</span>` : r ? `<span class="badge done">Last: ${r.pct}% · ${r.pct >= PASS_PCT ? "PASS" : "FAIL"}</span>` : ""}
           <h4 title="${esc(setTitle(x))}">${esc(setTitle(x))}</h4>
-          <div class="meta"><span>Score: ${r ? fmtNum(r.marks) : 0}</span><span>${clock} 70 Mins</span></div>
+          <div class="meta"><span>Score: ${r ? fmtNum(r.marks) : 0}</span><span>${clock} ${durationLabel()}</span></div>
           <a data-start="${x}">${p ? "Resume Exam" : "Start Exam"}</a>${deco}</div>`;
       }
       return `<div class="ecard"><span class="badge ${x.pct >= PASS_PCT ? "done" : "prog"}">${x.pct >= PASS_PCT ? "PASS" : "FAIL"} · ${fmtDate(x.date)}</span>
@@ -476,7 +495,7 @@ $("cards").onclick = e => {
   const i = +a.dataset.start;
   if (store.data.progress[i]) return (location.hash = "#/exam/" + i);
   const m = modal(`<h3>${esc(setTitle(i))}</h3>
-    <ul><li>Total questions: <b>50</b> (1 mark each)</li><li>Duration: <b>1 hr 10 min</b> – the exam submits automatically when time runs out</li>
+    <ul><li>Total questions: <b>${SETS[i].length}</b> (1 mark each)</li><li>Duration: <b>${durationLabel()}</b> – the exam submits automatically when time runs out</li>
     <li>Negative marking: <b>${NEG_MARK} mark</b> deducted for each wrong answer (none for unanswered questions)</li><li>Passing score: <b>${PASS_PCT}%</b></li><li>You can mark questions for review and come back to them</li></ul>
     <div class="actions"><button class="btn" id="mCancel">Cancel</button><button class="btn primary" id="mGo">Start Exam</button></div>`);
   m.querySelector("#mCancel").onclick = closeModal;
@@ -515,6 +534,8 @@ const exam = {
   render() {
     const { st } = this, n = SETS[this.setId].length, q = this.q();
     $("qnum").textContent = `Q ${st.cur + 1}/${n}`;
+    $("caselet").classList.toggle("hidden", !q.case);
+    $("caselet").innerHTML = q.case ? `<b>Case ${q.case.number}: ${esc(q.case.title)}</b>${esc(q.case.text)}` : "";
     $("qtext").textContent = q.q;
     $("options").innerHTML = q.options.map((o, k) => `
       <label class="opt ${st.answers[st.cur] === k ? "sel" : ""}">
@@ -649,6 +670,7 @@ function renderKey(id) {
   $("keyList").innerHTML = rows.filter(x => keyState.filter === "all" || x.s === keyState.filter).map(({ i, q, u, s }) => `
     <div class="box kq">
       <div class="kq-top"><span class="num">Q ${i + 1}/${rows.length}</span><span class="st ${s}">${label[s]}${s === "c" ? " · +1" : s === "w" ? " · −" + NEG_MARK : " · 0"}</span><span>Chapter ${q.ch}: ${esc(q.chapter)}</span></div>
+      ${q.case ? `<div class="caselet"><b>Case ${q.case.number}: ${esc(q.case.title)}</b>${esc(q.case.text)}</div>` : ""}
       <p class="qtext">${esc(q.q)}</p>
       ${q.options.map((o, k) => {
         const right = k === q.answer, mine = k === u;

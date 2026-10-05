@@ -15,7 +15,9 @@ st.markdown(
 
 html = (ROOT / "index.html").read_text(encoding="utf-8")
 questions = (ROOT / "questions.js").read_text(encoding="utf-8")
+ra_questions = (ROOT / "questions-ra.js").read_text(encoding="utf-8")
 # Inline the question bank so the page works inside Streamlit's iframe
 html = html.replace('<script src="questions.js"></script>', f"<script>{questions}</script>")
+html = html.replace('<script src="questions-ra.js"></script>', f"<script>{ra_questions}</script>")
 
 components.html(html, height=1000, scrolling=True)

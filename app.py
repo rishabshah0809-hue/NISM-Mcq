@@ -6,6 +6,8 @@ FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/questions.js": ("questions.js", "application/javascript; charset=utf-8"),
+    "/questions-ra.js": ("questions-ra.js", "application/javascript; charset=utf-8"),
+    "/research-analyst.html": ("research-analyst.html", "text/html; charset=utf-8"),
 }
 
 
